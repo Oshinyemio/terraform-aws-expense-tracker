@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expense Tracker – Login / Sign Up</title>
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@5.2.4/dist/amazon-cognito-identity.min.js"></script>
+  <script src="config.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 2rem;
+      color: #333;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h2, h3 {
+      font-family: 'Boogaloo', cursive;
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-family: 'Poppins', sans-serif;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      font-weight: 600;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    #status {
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .hidden {
+      display: none;
+    }
+    #passwordRequirements {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: -10px;
+      margin-bottom: 12px;
+    }
+    #toggleToSignup, #btnRevealConfirm, #btnResendCode {
+      background-color: #27ae60;
+    }
+    #toggleToSignup:hover, #btnRevealConfirm:hover, #btnResendCode:hover {
+      background-color: #1e8449;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Expense Tracker</h2>
+    <button id="toggleToSignup">Create an Account</button>
+
+    <div id="signinForm">
+      <label for="signinUsername">Username</label>
+      <input type="text" id="signinUsername" placeholder="Enter your username">
+      <label for="signinPassword">Password</label>
+      <input type="password" id="signinPassword" placeholder="Your password">
+      <button id="btnSignIn">Sign In</button>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <label for="signupUsername">Username</label>
+      <input type="text" id="signupUsername" placeholder="Choose a unique username">
+      <label for="signupEmail">Email</label>
+      <input type="email" id="signupEmail" placeholder="you@example.com">
+      <label for="signupPassword">Password</label>
+      <input type="password" id="signupPassword" placeholder="Minimum 8 characters">
+      <div id="passwordRequirements">
+        • At least 1 number<br>
+        • At least 1 special character<br>
+        • At least 1 uppercase letter<br>
+        • At least 1 lowercase letter
+      </div>
+      <button id="btnSignUp">Sign Up</button>
+    </div>
+
+    <button id="btnRevealConfirm">I have a verification code</button>
+    <div id="confirmSection" class="hidden">
+      <h3>Confirm Your Account</h3>
+      <label for="verifyUsername">Username</label>
+      <input type="text" id="verifyUsername" placeholder="Enter the username you chose">
+      <label for="verificationCode">Verification Code</label>
+      <input type="text" id="verificationCode" placeholder="Enter code from email">
+      <button id="btnConfirmCode">Confirm Account</button>
+      <button id="btnResendCode">Resend Confirmation Code</button>
+    </div>
+
+    <hr style="margin:20px 0; border-top:1px dashed #ccc;">
+    <p id="status"></p>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // 🚨 Verify required SDKs are available
+    if (typeof AmazonCognitoIdentity === 'undefined' || typeof window.config === 'undefined') {
+      document.getElementById("status").innerText = "❌ Error: Config or Cognito SDK failed to load.";
+      return;
+    }
+
+    // 🔐 Setup Cognito pool
+    const poolData = {
+      UserPoolId: window.config.userPoolId,
+      ClientId: window.config.clientId
+    };
+    const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+    let cognitoUser = null;
+
+    /**
+     * ✅ Display a status message
+     */
+    function showStatus(msg, isError = true) {
+      const statusEl = document.getElementById("status");
+      statusEl.style.color = isError ? "red" : "green";
+      statusEl.innerText = msg;
+      console.log(`${isError ? "❌" : "✅"} ${msg}`);
+    }
+
+    /**
+     * 🔁 Reset form to sign-in mode
+     */
+    function switchToSignIn() {
+      document.getElementById('confirmSection').classList.add('hidden');
+      document.getElementById('signupForm').classList.add('hidden');
+      document.getElementById('signinForm').classList.remove('hidden');
+      showStatus('You can now sign in.', false);
+    }
+
+    // 👤 Toggle between sign-in and sign-up
+    document.getElementById("toggleToSignup").addEventListener("click", () => {
+      document.getElementById("signinForm").classList.toggle("hidden");
+      document.getElementById("signupForm").classList.toggle("hidden");
+      showStatus("");
+    });
+
+    // 📤 Reveal verification section
+    document.getElementById("btnRevealConfirm").addEventListener("click", () => {
+      const lastUsername = document.getElementById("signupUsername").value.trim();
+      if (lastUsername) document.getElementById("verifyUsername").value = lastUsername;
+      document.getElementById("confirmSection").classList.remove("hidden");
+      showStatus("");
+    });
+
+    // 🧾 Handle Sign-Up
+    document.getElementById("btnSignUp").addEventListener("click", () => {
+      const username = document.getElementById("signupUsername").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+
+      // 🚫 Validation
+      if (!username || !email || !password) return showStatus("❗ Please fill in all fields.");
+      const pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+      if (!pwdRegex.test(password)) return showStatus("❗ Password requirements not met.");
+
+      const attributes = [new AmazonCognitoIdentity.CognitoUserAttribute({ Name: "email", Value: email })];
+
+      // 📨 Attempt sign-up
+      console.log("📧 Signing up user:", username);
+      userPool.signUp(username, password, attributes, null, (err) => {
+        if (err) return showStatus("❌ Sign-up error: " + err.message);
+        showStatus("✅ Sign-up successful! Enter your verification code.", false);
+      });
+    });
+
+    // 📩 Confirm verification code
+    document.getElementById("btnConfirmCode").addEventListener("click", () => {
+      const username = document.getElementById("verifyUsername").value.trim();
+      const code = document.getElementById("verificationCode").value.trim();
+
+      if (!username || !code) return showStatus("❗ Please enter username and code.");
+
+      const tempUser = new AmazonCognitoIdentity.CognitoUser({ Username: username, Pool: userPool });
+
+      console.log("📬 Verifying account for:", username);
+      tempUser.confirmRegistration(code, true, (err) => {
+        if (err) return showStatus("❌ Verification failed: " + err.message);
+        switchToSignIn();
+      });
+    });
+
+    // 🔁 Resend confirmation code
+    document.getElementById("btnResendCode").addEventListener("click", () => {
+      const username = document.getElementById("verifyUsername").value.trim();
+      if (!username) return showStatus("❗ Enter username to resend code.");
+
+      const tempUser = new AmazonCognitoIdentity.CognitoUser({ Username: username, Pool: userPool });
+
+      console.log("🔁 Resending code to:", username);
+      tempUser.resendConfirmationCode((err) => {
+        if (err) return showStatus("❌ Resend error: " + err.message);
+        showStatus("✅ Confirmation code resent.", false);
+      });
+    });
+
+    // 🔓 Handle Sign-In
+    document.getElementById("btnSignIn").addEventListener("click", () => {
+      const username = document.getElementById("signinUsername").value.trim();
+      const password = document.getElementById("signinPassword").value;
+
+      if (!username || !password) return showStatus("❗ Enter username and password.");
+
+      const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+        Username: username,
+        Password: password
+      });
+      cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: username, Pool: userPool });
+
+      console.log("🔐 Attempting sign-in for:", username);
+      cognitoUser.authenticateUser(authDetails, {
+        onSuccess: (result) => {
+          const idToken = result.getIdToken().getJwtToken();
+          sessionStorage.setItem('idToken', idToken);
+          sessionStorage.setItem('signinUsername', username);
+          console.log("✅ Sign-in successful. Redirecting...");
+          window.location.href = 'tracker.html';
+        },
+        onFailure: (err) => showStatus("❌ Sign-in error: " + err.message)
+      });
+    });
+  });
+</script>
+</body>
+</html>

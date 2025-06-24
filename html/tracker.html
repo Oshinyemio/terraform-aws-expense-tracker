@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expense Tracker – Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@5.2.4/dist/amazon-cognito-identity.min.js"></script>
+  <script src="config.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 2rem;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    h1, h2 {
+      font-family: 'Boogaloo', cursive;
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-family: 'Poppins', sans-serif;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: vertical;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      font-weight: 600;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .logout-btn {
+      background-color: #e74c3c;
+    }
+    .logout-btn:hover {
+      background-color: #c0392b;
+    }
+    .highlight {
+      text-align: center;
+      font-size: 1.1rem;
+      color: #16a085;
+      margin-top: 10px;
+    }
+    #status {
+      text-align: center;
+      margin-top: 1rem;
+      color: red;
+    }
+    #btnDownloadCSV {
+      background-color: #27ae60;
+      display: none;
+    }
+    #btnDownloadCSV:hover {
+      background-color: #1e8449;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Expense Tracker Dashboard</h1>
+    <button class="logout-btn" id="btnSignOut">Sign Out</button>
+    <p id="welcomeMsg"></p>
+    <p id="status"></p>
+
+    <h2>Add Expense</h2>
+    <label for="userIdAdd">User ID</label>
+    <input type="text" id="userIdAdd" placeholder="Enter your username">
+    <label for="amount">Amount</label>
+    <input type="number" id="amount" placeholder="e.g. 20.50">
+    <label for="category">Category</label>
+    <input type="text" id="category" placeholder="e.g. Food">
+    <label for="description">Description</label>
+    <textarea id="description" placeholder="e.g. Lunch with friends"></textarea>
+    <button id="btnAddExpense">Add Expense</button>
+
+    <h2>Get Expenses</h2>
+    <label for="userIdGet">User ID</label>
+    <input type="text" id="userIdGet" placeholder="Enter your username">
+    <button id="btnGetExpenses">View My Expenses</button>
+    <div class="highlight" id="currentUserInfo"></div>
+    <div id="output"></div>
+    <button id="btnDownloadCSV">Download as CSV</button>
+  </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // 🚨 Verify required resources
+    if (typeof AmazonCognitoIdentity === 'undefined' || typeof window.config === 'undefined') {
+      document.getElementById("status").innerText = "❌ Error: Config or Cognito SDK failed to load.";
+      return;
+    }
+
+    // 🔐 Initialize Cognito User Pool
+    const API_BASE = window.config.apiBase;
+    const poolData = {
+      UserPoolId: window.config.userPoolId,
+      ClientId: window.config.clientId
+    };
+    const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+
+    // 🔗 DOM elements
+    const statusEl = document.getElementById("status");
+    const welcomeEl = document.getElementById("welcomeMsg");
+    const userIdAddEl = document.getElementById("userIdAdd");
+    const userIdGetEl = document.getElementById("userIdGet");
+    const outputEl = document.getElementById("output");
+    const infoEl = document.getElementById("currentUserInfo");
+    const downloadBtn = document.getElementById("btnDownloadCSV");
+
+    /**
+     * 💬 Display status messages
+     */
+    function showStatus(msg, isError = true) {
+      statusEl.style.color = isError ? "red" : "green";
+      statusEl.innerText = msg;
+      console.log(`${isError ? "❌" : "✅"} ${msg}`);
+    }
+
+    /**
+     * 🔍 Load session data and validate login
+     */
+    const idToken = sessionStorage.getItem('idToken');
+    const username = sessionStorage.getItem('signinUsername');
+    if (!idToken || !username) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // 🙋‍♂️ Set user context
+    welcomeEl.textContent = `Welcome, ${username}!`;
+    userIdAddEl.value = username;
+    userIdGetEl.value = username;
+
+    /**
+     * 🚪 Handle Sign-Out
+     */
+    document.getElementById("btnSignOut").addEventListener("click", () => {
+      const cognitoUser = new AmazonCognitoIdentity.CognitoUser({
+        Username: username,
+        Pool: userPool
+      });
+      cognitoUser.signOut();
+      sessionStorage.clear();
+      window.location.href = 'login.html';
+    });
+
+    /**
+     * 💰 Add a new expense
+     */
+    document.getElementById("btnAddExpense").addEventListener("click", async () => {
+      const userId = userIdAddEl.value.trim();
+      const amount = parseFloat(document.getElementById('amount').value);
+      const category = document.getElementById('category').value.trim();
+      const description = document.getElementById('description').value.trim();
+
+      if (!idToken || !userId || isNaN(amount) || !category) {
+        showStatus('❗ Please enter valid User ID, Amount, and Category.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/add-expense`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': idToken
+          },
+          body: JSON.stringify({ userId, amount, category, description })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          alert('✅ Expense added successfully');
+          document.getElementById('amount').value = '';
+          document.getElementById('category').value = '';
+          document.getElementById('description').value = '';
+          showStatus('');
+        } else {
+          showStatus(`❌ Error: ${result.error || res.statusText}`);
+        }
+      } catch (err) {
+        showStatus('❌ Network error');
+      }
+    });
+
+    /**
+     * 📦 Get user's expenses
+     */
+    document.getElementById("btnGetExpenses").addEventListener("click", async () => {
+      const userId = userIdGetEl.value.trim();
+      if (!idToken || !userId) {
+        showStatus('❗ User ID is required.');
+        return;
+      }
+
+      outputEl.innerHTML = '🔄 Loading...';
+      infoEl.textContent = `📋 Viewing expenses for: ${userId}`;
+      downloadBtn.style.display = 'none';
+
+      try {
+        const res = await fetch(`${API_BASE}/get-expense?userId=${encodeURIComponent(userId)}`, {
+          method: 'GET',
+          headers: { 'Authorization': idToken }
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || res.statusText);
+
+        const expenses = data.expenses || [];
+        if (expenses.length) {
+          outputEl.innerHTML = expenses.map(exp => `
+            <div class="expense">
+              <strong>${exp.timestamp}</strong><br>
+              ${exp.category} – $${exp.amount}<br>
+              <em>${exp.description}</em>
+            </div>`).join('');
+          downloadBtn.style.display = 'block';
+          setupDownload(userId);
+        } else {
+          outputEl.innerHTML = '<p>📭 No expenses found.</p>';
+        }
+      } catch (err) {
+        outputEl.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    });
+
+    /**
+     * 🧾 Download expenses as CSV
+     */
+    function setupDownload(userId) {
+      downloadBtn.onclick = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/export-expense?userId=${encodeURIComponent(userId)}`, {
+            method: 'GET',
+            headers: { 'Authorization': idToken }
+          });
+
+          if (!res.ok) throw new Error(`Server: ${res.status}`);
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `expenses_${userId}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          alert('❌ CSV download error: ' + err.message);
+        }
+      };
+    }
+  });
+</script>
+
+</body>
+</html>

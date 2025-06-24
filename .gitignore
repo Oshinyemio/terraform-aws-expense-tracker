@@ -1,0 +1,14 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+
+# Lambda build artifacts
+*.zip
+__pycache__/
+*.pyc
+
+# macOS & Windows system files
+.DS_Store
+Thumbs.db
