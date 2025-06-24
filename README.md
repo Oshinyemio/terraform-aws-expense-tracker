@@ -1,55 +1,138 @@
-# AWS Serverless Expense Tracker (Terraform Edition) ⚙️💰
+# 🧾 AWS Serverless Expense Tracker (Terraform Edition)
 
-This project demonstrates how to build and deploy a **serverless expense tracker** using **Terraform** for complete Infrastructure as Code (IaC) setup within the **AWS Free Tier**.
+A fully serverless, multi-user expense tracker built with **Terraform** using AWS services like **Lambda**, **API Gateway**, **DynamoDB**, **Cognito**, **S3**, and **CloudFront** — all deployed via Infrastructure as Code (IaC) within the AWS Free Tier.
 
-> ✅ Built from scratch with modular Terraform structure.  
-> ✅ Ideal for learning or showcasing Terraform and serverless deployment patterns on AWS.
+> 🔐 Authenticated access, 📊 exportable data, and 💾 receipt uploads — all backed by secure, modular Terraform.
 
 ---
 
 ## 🚀 Tech Stack
 
-| Layer       | Service Used                  |
-|-------------|-------------------------------|
-| **IaC**     | Terraform (modular setup)     |
-| **Auth**    | Amazon Cognito                |
-| **Backend** | AWS API Gateway + Lambda      |
-| **Database**| DynamoDB                      |
-| **Storage** | S3 (JSON + receipt images)    |
-| **Frontend**| Static HTML (hosted on S3 + CloudFront) |
+| Layer        | Service                     |
+|--------------|-----------------------------|
+| IaC          | Terraform (modular setup)   |
+| Auth         | Amazon Cognito (via `auth/`)|
+| Backend      | API Gateway + Lambda        |
+| Database     | DynamoDB (`db/` module)     |
+| Storage      | Amazon S3 (`s3_data/`)      |
+| Frontend     | HTML/CSS via CloudFront     |
 
 ---
 
-## 🧱 Terraform Module Structure
+## ✅ Features
+
+- 🔐 Secure login using Amazon Cognito
+- 💸 Add, retrieve, and export user-specific expenses
+- 🧾 Upload and store receipt images in S3
+- 🗃️ Export expenses as JSON for analysis (e.g., QuickSight)
+- ⚙️ All components deployed with Terraform
+- 🌍 CORS support enabled
+- 🧱 Organized with reusable, isolated modules
+- 🧪 Designed to stay within the AWS Free Tier
+
+---
+
+## 🧱 Project Structure
+
+```
+
+myET/
+│
+├── build/
+│   └── lambda\_zips/
+│       ├── add.zip
+│       ├── get.zip
+│       └── export.zip
+│
+├── html/
+│   ├── login.html
+│   └── tracker.html
+│
+├── modules/
+│   ├── api/
+│   ├── auth/                      # Amazon Cognito
+│   ├── cors/                      # CORS configuration
+│   ├── db/                        # DynamoDB table
+│   ├── frontend/                  # S3 + CloudFront + config.js.tpl
+│   ├── iam/                       # IAM roles & policies
+│   ├── lambdas/
+│   │   ├── add/
+│   │   ├── get/
+│   │   └── export/
+│   └── s3_data/                   # S3 bucket for receipts/data
+│
+├── main.tf                       # Root Terraform config
+├── outputs.tf                    # Project-wide outputs
+├── variables.tf                  # Common root-level variables
+└── README.md                     # You're reading it!
+
+````
+
+---
+
+## 🛠️ How to Deploy
+
+Make sure you have:
+- AWS CLI configured
+- Terraform installed (v1.6+)
+
+### 1. Clone the Repo
 
 ```bash
-myET/
-├── main.tf              # Root configuration
-├── variables.tf         # Input variables
-├── outputs.tf           # Output values
-├── modules/
-│   ├── api_gateway/
-│   ├── lambda/
-│   ├── dynamodb/
-│   ├── cognito/
-│   ├── iam/
-│   ├── s3/
-│   └── cloudfront/
-└── build/
-    └── lambda_zips/
-✅ Features
-🚀 Deploys entire architecture via terraform apply
+git clone https://github.com/Oshinyemio/terraform-aws-expense-tracker.git
+cd terraform-aws-expense-tracker
+````
 
-👥 Secure user authentication with Cognito
+### 2. Initialize Terraform
 
-📥 Add and retrieve expenses (per user)
+```bash
+terraform init
+```
 
-🧾 Upload receipts as images (optional)
+### 3. Apply Infrastructure
 
-📊 Export data for visualization (QuickSight-ready)
+```bash
+terraform apply
+```
 
-🔐 Fine-grained IAM roles and policies
+Terraform will:
 
-🌍 Cross-Origin Resource Sharing (CORS) support
+* Create the API Gateway, Lambda functions, and DynamoDB table
+* Set up Cognito for user sign-up/login
+* Create S3 buckets for app hosting and data storage
+* Deploy your `login.html`, `tracker.html`, and generate `config.js` via `config.js.tpl`
 
-🧪 Designed to stay within the AWS Free Tier
+---
+
+## 🌐 After Deployment
+
+1. Copy the CloudFront URL output from Terraform.
+2. Open it in your browser — the app is live!
+3. Use the login/signup interface to create a new user.
+4. Start adding expenses and (optionally) uploading receipts.
+
+---
+
+## 📸 Project Architecture
+
+![tracker-architecture](https://github.com/user-attachments/assets/2c34ecb4-db2b-425e-b5b4-fcacfc5b1613)
+
+---
+
+## 📄 License
+
+MIT License — free to use, adapt, and learn from.
+
+---
+
+## 🙋 About the Author
+
+**Ope (Oshinyemio)**
+Cloud | DevOps | Terraform | AWS
+[GitHub](https://github.com/Oshinyemio)
+
+---
+
+## ⭐️ Star This Project
+
+If you found this project helpful or interesting, consider starring ⭐ the repo to support more Terraform-based projects like this.
